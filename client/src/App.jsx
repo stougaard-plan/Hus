@@ -37,6 +37,7 @@ function App() {
   const [selectedTask, setSelectedTask] = useState(null);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedPerson, setSelectedPerson] = useState('Alle');
 
   // Plan modal
   const [showPlanModal, setShowPlanModal] = useState(false);
@@ -103,15 +104,27 @@ function App() {
     );
   }
 
+  // Person filter helper — shared tasks (assigned to both) always show
+  const matchesPerson = (assignedTo) => {
+    if (selectedPerson === 'Alle') return true;
+    if (!assignedTo) return true;
+    // Instance: string like "Lasse". Task: array like ["Lasse", "Julie"]
+    if (Array.isArray(assignedTo)) {
+      return assignedTo.length > 1 || assignedTo.includes(selectedPerson);
+    }
+    return assignedTo === selectedPerson;
+  };
+
   // Filters
   const filteredTasks = tasks.filter((t) => {
     if (selectedCategory !== 'Alle' && t.category !== selectedCategory) return false;
     if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
+    if (!matchesPerson(t.assigned_to)) return false;
     return true;
   });
 
-  const plannedInstances = instances.filter((i) => i.status === 'planned');
-  const doneInstances = instances.filter((i) => i.status === 'done');
+  const plannedInstances = instances.filter((i) => i.status === 'planned' && matchesPerson(i.assigned_to));
+  const doneInstances = instances.filter((i) => i.status === 'done' && matchesPerson(i.assigned_to));
 
   // Urgent: overdue or within 7 days
   const urgentInstances = plannedInstances
@@ -186,6 +199,22 @@ function App() {
           </div>
         )}
       </header>
+
+      {/* Person filter */}
+      <div style={styles.personBar}>
+        {['Alle', 'Lasse', 'Julie'].map((p) => (
+          <button
+            key={p}
+            onClick={() => setSelectedPerson(p)}
+            style={{
+              ...styles.personBtn,
+              ...(selectedPerson === p ? styles.personBtnActive : {}),
+            }}
+          >
+            {p === 'Alle' ? 'Familien' : p}
+          </button>
+        ))}
+      </div>
 
       {/* Nav */}
       <nav style={styles.nav}>
@@ -561,6 +590,30 @@ const styles = {
     fontSize: 13,
     marginTop: 6,
     opacity: 0.9,
+  },
+
+  // Person filter
+  personBar: {
+    display: 'flex',
+    gap: 0,
+    background: '#fff',
+    borderBottom: '1px solid #e2e8f0',
+    padding: '8px 16px',
+  },
+  personBtn: {
+    flex: 1,
+    padding: '6px 0',
+    border: '1px solid #e2e8f0',
+    background: '#f8fafc',
+    fontSize: 13,
+    fontWeight: 500,
+    color: '#64748b',
+    cursor: 'pointer',
+  },
+  personBtnActive: {
+    background: '#2563eb',
+    color: '#fff',
+    borderColor: '#2563eb',
   },
 
   // Nav
