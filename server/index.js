@@ -14,6 +14,9 @@ const pool = new Pool({
 app.use(cors());
 app.use(express.json());
 
+// Health check — must respond before static/SPA middleware
+app.get('/health', (req, res) => res.json({ ok: true }));
+
 // Serve static frontend in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../client/dist')));
@@ -223,6 +226,28 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-app.listen(port, '0.0.0.0', () => {
-  console.log(`HusApp API running on port ${port}`);
+// Auto-init database, then start server
+async function initDb() {
+  try {
+    const fs = require('fs');
+    const schema = fs.readFileSync(path.join(__dirname, '../db/schema.sql'), 'utf8');
+    const seed = fs.readFileSync(path.join(__dirname, '../db/seed.sql'), 'utf8');
+    console.log('Running schema...');
+    await pool.query(schema);
+    const existing = await pool.query('SELECT COUNT(*) FROM tasks');
+    if (parseInt(existing.rows[0].count) === 0) {
+      console.log('Running seed...');
+      await pool.query(seed);
+      console.log('Seed data inserted.');
+    }
+    console.log('Database ready.');
+  } catch (err) {
+    console.error('DB init warning:', err.message);
+  }
+}
+
+initDb().then(() => {
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`HusApp API running on port ${port}`);
+  });
 });
