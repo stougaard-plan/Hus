@@ -1,0 +1,16 @@
+{
+  "name": "husapp",
+  "version": "1.0.0",
+  "description": "HusApp - Kløvervej 23 vedligeholdelsesapp",
+  "scripts": {
+    "start": "node server/index.js",
+    "build": "cd client && npm install && npm run build",
+    "db:init": "node server/db-init.js",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "postinstall": "cd server && npm install && cd ../client && npm install && npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
