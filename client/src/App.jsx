@@ -118,6 +118,31 @@ function App() {
     .filter((i) => i.planned_date && getUrgentLabel(i.planned_date))
     .sort((a, b) => new Date(a.planned_date) - new Date(b.planned_date));
 
+  // Weekly progress
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7)); // Monday
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+
+  const weekPlanned = plannedInstances.filter((i) => {
+    if (!i.planned_date) return false;
+    const d = new Date(i.planned_date);
+    return d >= weekStart && d <= weekEnd;
+  });
+  const weekDone = doneInstances.filter((i) => {
+    if (!i.done_date) return false;
+    const d = new Date(i.done_date);
+    return d >= weekStart && d <= weekEnd;
+  });
+  const weekTotal = weekPlanned.length + weekDone.length;
+  const weekPct = weekTotal > 0 ? Math.round((weekDone.length / weekTotal) * 100) : 0;
+
+  const weekDays = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn'];
+  const todayDayIdx = (now.getDay() + 6) % 7; // 0=Monday
+
   // Actions
   const markDone = async (instanceId) => {
     await api.updateInstance(instanceId, { status: 'done' });
@@ -185,6 +210,37 @@ function App() {
         {/* OPGAVER VIEW */}
         {view === 'opgaver' && (
           <>
+            {/* Weekly progress */}
+            {weekTotal > 0 && (
+              <div style={styles.weekPanel}>
+                <div style={styles.weekHeader}>
+                  <span style={styles.weekTitle}>Denne uge</span>
+                  <span style={styles.weekScore}>{weekDone.length}/{weekTotal} klaret</span>
+                </div>
+                <div style={styles.progressBarBg}>
+                  <div style={{ ...styles.progressBarFill, width: `${weekPct}%` }} />
+                </div>
+                <div style={styles.weekDays}>
+                  {weekDays.map((day, i) => {
+                    const dayDate = new Date(weekStart);
+                    dayDate.setDate(weekStart.getDate() + i);
+                    const dateStr = dayDate.toISOString().split('T')[0];
+                    const hasDone = doneInstances.some((inst) => inst.done_date && inst.done_date.startsWith(dateStr));
+                    const hasPlanned = plannedInstances.some((inst) => inst.planned_date && inst.planned_date.startsWith(dateStr));
+                    const isToday = i === todayDayIdx;
+                    return (
+                      <div key={i} style={{ ...styles.weekDay, ...(isToday ? styles.weekDayToday : {}) }}>
+                        <span style={styles.weekDayLabel}>{day}</span>
+                        <span style={styles.weekDayDot}>
+                          {hasDone ? '\u{2705}' : hasPlanned ? '\u{1F4CB}' : '\u{00B7}'}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Urgent panel */}
             {urgentInstances.length > 0 && (
               <div style={styles.urgentPanel}>
@@ -213,6 +269,17 @@ function App() {
                 })}
               </div>
             )}
+
+            {/* No tasks message when nothing is planned */}
+            {weekTotal === 0 && urgentInstances.length === 0 && (
+              <div style={styles.emptyDashboard}>
+                <div style={styles.emptyIcon}>{'\u{1F3E1}'}</div>
+                <p style={styles.emptyTitle}>Alt er styr på!</p>
+                <p style={styles.emptySubtitle}>Planlæg opgaver fra listen nedenfor</p>
+              </div>
+            )}
+
+            <h3 style={styles.libraryTitle}>Opgavebibliotek</h3>
 
             <input
               type="search"
@@ -524,6 +591,67 @@ const styles = {
   // Main
   main: { padding: '12px 16px 80px' },
   loading: { textAlign: 'center', padding: 40, color: '#64748b' },
+
+  // Weekly progress
+  weekPanel: {
+    background: '#fff',
+    borderRadius: 12,
+    padding: '14px 16px',
+    marginBottom: 12,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+  },
+  weekHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  weekTitle: { fontWeight: 600, fontSize: 15 },
+  weekScore: { fontSize: 13, color: '#16a34a', fontWeight: 600 },
+  progressBarBg: {
+    height: 6,
+    background: '#e2e8f0',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  progressBarFill: {
+    height: '100%',
+    background: 'linear-gradient(90deg, #16a34a, #22c55e)',
+    borderRadius: 3,
+    transition: 'width 0.3s',
+  },
+  weekDays: {
+    display: 'flex',
+    justifyContent: 'space-between',
+  },
+  weekDay: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    flex: 1,
+  },
+  weekDayToday: {
+    fontWeight: 700,
+  },
+  weekDayLabel: { fontSize: 11, color: '#94a3b8' },
+  weekDayDot: { fontSize: 14, marginTop: 2 },
+
+  // Empty dashboard
+  emptyDashboard: {
+    textAlign: 'center',
+    padding: '24px 16px',
+    background: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+  },
+  emptyIcon: { fontSize: 36 },
+  emptyTitle: { fontWeight: 600, fontSize: 16, margin: '8px 0 4px', color: '#1e293b' },
+  emptySubtitle: { fontSize: 13, color: '#94a3b8', margin: 0 },
+
+  // Library title
+  libraryTitle: { fontSize: 15, fontWeight: 600, margin: '16px 0 10px', color: '#475569' },
 
   // Urgent panel
   urgentPanel: {
