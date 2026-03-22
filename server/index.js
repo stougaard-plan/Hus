@@ -226,28 +226,26 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Auto-init database, then start server
-async function initDb() {
-  try {
-    const fs = require('fs');
-    const schema = fs.readFileSync(path.join(__dirname, '../db/schema.sql'), 'utf8');
-    const seed = fs.readFileSync(path.join(__dirname, '../db/seed.sql'), 'utf8');
-    console.log('Running schema...');
-    await pool.query(schema);
-    const existing = await pool.query('SELECT COUNT(*) FROM tasks');
-    if (parseInt(existing.rows[0].count) === 0) {
-      console.log('Running seed...');
-      await pool.query(seed);
-      console.log('Seed data inserted.');
+// Start server immediately so healthcheck passes, then init DB
+app.listen(port, '0.0.0.0', () => {
+  console.log(`HusApp API running on port ${port}`);
+  // Init database after server is listening
+  (async () => {
+    try {
+      const fs = require('fs');
+      const schema = fs.readFileSync(path.join(__dirname, '../db/schema.sql'), 'utf8');
+      const seed = fs.readFileSync(path.join(__dirname, '../db/seed.sql'), 'utf8');
+      console.log('Running schema...');
+      await pool.query(schema);
+      const existing = await pool.query('SELECT COUNT(*) FROM tasks');
+      if (parseInt(existing.rows[0].count) === 0) {
+        console.log('Running seed...');
+        await pool.query(seed);
+        console.log('Seed data inserted.');
+      }
+      console.log('Database ready.');
+    } catch (err) {
+      console.error('DB init warning:', err.message);
     }
-    console.log('Database ready.');
-  } catch (err) {
-    console.error('DB init warning:', err.message);
-  }
-}
-
-initDb().then(() => {
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`HusApp API running on port ${port}`);
-  });
+  })();
 });
