@@ -11,6 +11,19 @@ const CATEGORY_ICONS = {
 };
 const VIEWS = ['opgaver', 'plan', 'historik'];
 
+function getUrgentLabel(plannedDate) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const planned = new Date(plannedDate);
+  planned.setHours(0, 0, 0, 0);
+  const diffDays = Math.round((planned - today) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return { text: 'Overskredet', color: '#dc2626', bg: '#fef2f2' };
+  if (diffDays === 0) return { text: 'I dag', color: '#d97706', bg: '#fffbeb' };
+  if (diffDays === 1) return { text: 'I morgen', color: '#d97706', bg: '#fffbeb' };
+  if (diffDays <= 7) return { text: `Om ${diffDays} dage`, color: '#2563eb', bg: '#eff6ff' };
+  return null;
+}
+
 function App() {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem('husapp_auth') === '1');
   const [pin, setPin] = useState('');
@@ -71,7 +84,7 @@ function App() {
       <div style={styles.loginContainer}>
         <div style={styles.loginCard}>
           <h1 style={styles.loginTitle}>{'\u{1F3E1}'} HusApp</h1>
-          <p style={styles.loginSubtitle}>Kl\u00F8vervej 23, Roskilde</p>
+          <p style={styles.loginSubtitle}>Kløvervej 23, Roskilde</p>
           <form onSubmit={handleLogin}>
             <input
               type="password"
@@ -99,6 +112,11 @@ function App() {
 
   const plannedInstances = instances.filter((i) => i.status === 'planned');
   const doneInstances = instances.filter((i) => i.status === 'done');
+
+  // Urgent: overdue or within 7 days
+  const urgentInstances = plannedInstances
+    .filter((i) => i.planned_date && getUrgentLabel(i.planned_date))
+    .sort((a, b) => new Date(a.planned_date) - new Date(b.planned_date));
 
   // Actions
   const markDone = async (instanceId) => {
@@ -138,7 +156,7 @@ function App() {
         <h1 style={styles.headerTitle}>{'\u{1F3E1}'} HusApp</h1>
         {stats && (
           <div style={styles.statsBar}>
-            <span>{'\u{2705}'} {stats.done} udf\u00F8rt</span>
+            <span>{'\u{2705}'} {stats.done} udført</span>
             <span>{'\u{1F4C5}'} {stats.planned} planlagt</span>
           </div>
         )}
@@ -162,14 +180,43 @@ function App() {
       </nav>
 
       <main style={styles.main}>
-        {loading && <div style={styles.loading}>Indl\u00E6ser...</div>}
+        {loading && <div style={styles.loading}>Indlæser...</div>}
 
         {/* OPGAVER VIEW */}
         {view === 'opgaver' && (
           <>
+            {/* Urgent panel */}
+            {urgentInstances.length > 0 && (
+              <div style={styles.urgentPanel}>
+                <h3 style={styles.urgentTitle}>Kræver opmærksomhed</h3>
+                {urgentInstances.map((inst) => {
+                  const label = getUrgentLabel(inst.planned_date);
+                  return (
+                    <div key={inst.id} style={{ ...styles.urgentCard, borderLeftColor: label.color }}>
+                      <div style={styles.urgentCardHeader}>
+                        <span style={styles.urgentTaskName}>
+                          {CATEGORY_ICONS[inst.category]} {inst.title}
+                        </span>
+                        <span style={{ ...styles.urgentBadge, color: label.color, background: label.bg }}>
+                          {label.text}
+                        </span>
+                      </div>
+                      <div style={styles.urgentMeta}>
+                        {'\u{1F4C5}'} {new Date(inst.planned_date).toLocaleDateString('da-DK')}
+                        {inst.assigned_to && <span> · {inst.assigned_to}</span>}
+                      </div>
+                      <button style={styles.urgentDoneBtn} onClick={() => markDone(inst.id)}>
+                        {'\u{2705}'} Udført
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <input
               type="search"
-              placeholder="S\u00F8g opgaver..."
+              placeholder="Søg opgaver..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={styles.searchInput}
@@ -207,7 +254,7 @@ function App() {
                 <div style={styles.taskMeta}>
                   <span>{task.estimated_minutes} min</span>
                   {task.season && <span>{'\u{1F324}\uFE0F'} {task.season}</span>}
-                  {task.child_friendly && <span>{'\u{1F476}'} B\u00F8rnevenlig</span>}
+                  {task.child_friendly && <span>{'\u{1F476}'} Børnevenlig</span>}
                   <span>{task.assigned_to?.join(', ')}</span>
                 </div>
 
@@ -231,7 +278,7 @@ function App() {
                         openPlanForTask(task.id);
                       }}
                     >
-                      {'\u{1F4C5}'} Planl\u00E6g opgave
+                      {'\u{1F4C5}'} Planlæg opgave
                     </button>
                   </div>
                 )}
@@ -251,7 +298,7 @@ function App() {
             </div>
 
             {plannedInstances.length === 0 && (
-              <p style={styles.empty}>Ingen planlagte opgaver. Planl\u00E6g en fra opgavelisten!</p>
+              <p style={styles.empty}>Ingen planlagte opgaver. Planlæg en fra opgavelisten!</p>
             )}
 
             {plannedInstances.map((inst) => (
@@ -270,7 +317,7 @@ function App() {
                 </div>
                 <div style={styles.instanceActions}>
                   <button style={styles.doneBtn} onClick={() => markDone(inst.id)}>
-                    {'\u{2705}'} Udf\u00F8rt
+                    {'\u{2705}'} Udført
                   </button>
                   <button style={styles.deleteBtn} onClick={() => deleteInstance(inst.id)}>
                     {'\u{1F5D1}\uFE0F'} Slet
@@ -284,7 +331,7 @@ function App() {
         {/* HISTORIK VIEW */}
         {view === 'historik' && (
           <>
-            <h2 style={styles.sectionTitle}>Udf\u00F8rte opgaver ({doneInstances.length})</h2>
+            <h2 style={styles.sectionTitle}>Udførte opgaver ({doneInstances.length})</h2>
 
             {stats && stats.byCategory.length > 0 && (
               <div style={styles.statsGrid}>
@@ -298,7 +345,7 @@ function App() {
             )}
 
             {doneInstances.length === 0 && (
-              <p style={styles.empty}>Ingen udf\u00F8rte opgaver endnu.</p>
+              <p style={styles.empty}>Ingen udførte opgaver endnu.</p>
             )}
 
             {doneInstances.map((inst) => (
@@ -307,7 +354,7 @@ function App() {
                   <span style={styles.instanceTitle}>
                     {CATEGORY_ICONS[inst.category]} {inst.title}
                   </span>
-                  <span style={styles.doneBadge}>{'\u{2705}'} Udf\u00F8rt</span>
+                  <span style={styles.doneBadge}>{'\u{2705}'} Udført</span>
                 </div>
                 <div style={styles.instanceMeta}>
                   {inst.done_date && (
@@ -325,7 +372,7 @@ function App() {
       {showPlanModal && (
         <div style={styles.modalOverlay} onClick={() => setShowPlanModal(false)}>
           <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3 style={styles.modalTitle}>Planl\u00E6g opgave</h3>
+            <h3 style={styles.modalTitle}>Planlæg opgave</h3>
             <form onSubmit={planTask}>
               <label style={styles.label}>Opgave</label>
               <select
@@ -334,7 +381,7 @@ function App() {
                 style={styles.select}
                 required
               >
-                <option value="">V\u00E6lg opgave...</option>
+                <option value="">Vælg opgave...</option>
                 {tasks.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.category}: {t.title}
@@ -362,10 +409,10 @@ function App() {
 
               <div style={styles.modalActions}>
                 <button type="button" style={styles.cancelBtn} onClick={() => setShowPlanModal(false)}>
-                  Annull\u00E9r
+                  Annullér
                 </button>
                 <button type="submit" style={styles.submitBtn}>
-                  Planl\u00E6g
+                  Planlæg
                 </button>
               </div>
             </form>
@@ -477,6 +524,59 @@ const styles = {
   // Main
   main: { padding: '12px 16px 80px' },
   loading: { textAlign: 'center', padding: 40, color: '#64748b' },
+
+  // Urgent panel
+  urgentPanel: {
+    background: '#fff',
+    borderRadius: 12,
+    padding: '14px 16px',
+    marginBottom: 16,
+    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+    border: '1px solid #fecaca',
+  },
+  urgentTitle: {
+    margin: '0 0 10px',
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#dc2626',
+  },
+  urgentCard: {
+    padding: '10px 12px',
+    borderLeft: '3px solid',
+    borderRadius: 6,
+    marginBottom: 8,
+    background: '#fafafa',
+  },
+  urgentCardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  urgentTaskName: { fontWeight: 600, fontSize: 14 },
+  urgentBadge: {
+    padding: '2px 8px',
+    borderRadius: 10,
+    fontSize: 11,
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+  },
+  urgentMeta: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 4,
+  },
+  urgentDoneBtn: {
+    marginTop: 6,
+    padding: '6px 12px',
+    background: '#16a34a',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    fontSize: 13,
+    fontWeight: 500,
+    cursor: 'pointer',
+  },
 
   // Search
   searchInput: {
